@@ -70,6 +70,19 @@ Each tier is self-contained. Users advance when they choose to.
 
 **Memory agents**: `ManageMemory` and `ContextMemory` get special handling — `user_guid` arg is stripped, and `/chat` auto-injects `<memory>` context if ContextMemory is loaded.
 
+## Branching and Release Model
+
+**`main` is production.** The install one-liners (`curl ... install.sh | bash`) pull from `main`. Users get whatever is on `main`.
+
+**Development happens on feature/fix branches.** Commits accumulate on the working branch (e.g., `3-device-code-auth-gets-stuck-...`). Multiple fixes and features can stack up before merging.
+
+**Promotion path:**
+1. Commit to feature branch (where active development happens)
+2. When ready to release, merge to `main` with a `release: vX.Y.Z` commit
+3. Bump `rapp_brainstem/VERSION` as part of the release commit
+
+**Do not push directly to `main`** except via a merge at release time. The one-liner install is sacred — `main` must always be in a working state.
+
 ## Key Conventions
 
 - **Python 3.11** target; venv at `~/.brainstem/venv`
