@@ -65,7 +65,8 @@ CORE_AGENTS = {
     'basic_agent.py',
     'manage_memory_agent.py',
     'context_memory_agent.py',
-    'learn_new_agent.py'
+    'learn_new_agent.py',
+    'rapp_agent.py'
 }
 
 
