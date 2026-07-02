@@ -134,7 +134,9 @@ function Ensure-Pip {
     $prev = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
-        & $py -m ensurepip --upgrade --default-pip 2>&1 | ForEach-Object { "$_" }
+        # Write-Host, not bare pipeline output: Ensure-Pip's return value is its
+        # pipeline — stray tool output here would corrupt the caller's boolean.
+        & $py -m ensurepip --upgrade --default-pip 2>&1 | ForEach-Object { Write-Host "$_" }
     } catch {
     } finally {
         $ErrorActionPreference = $prev
@@ -150,7 +152,7 @@ function Ensure-Pip {
     $ErrorActionPreference = 'Continue'
     try {
         Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile $getPip -UseBasicParsing -TimeoutSec 120
-        & $py $getPip 2>&1 | ForEach-Object { "$_" }
+        & $py $getPip 2>&1 | ForEach-Object { Write-Host "$_" }
     } catch {
     } finally {
         $ErrorActionPreference = $prev
