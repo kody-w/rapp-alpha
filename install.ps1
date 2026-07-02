@@ -444,6 +444,14 @@ function Setup-Dependencies {
     Push-Location "$BRAINSTEM_HOME\src\rapp_brainstem"
     Run-PipInstall
     $depsOk = Check-PythonDeps
+    if (-not $depsOk) {
+        # v0.6.2 accidentally self-healed transient pip failures via the second
+        # Run-PipInstall in Launch-Brainstem. Keep one deliberate retry here so
+        # a PyPI/DNS blip doesn't hard-abort a fresh install.
+        Write-Host "  [..] Dependency check failed — retrying pip install once..." -ForegroundColor Yellow
+        Run-PipInstall
+        $depsOk = Check-PythonDeps
+    }
     Pop-Location
     if (-not $depsOk) {
         # Never print [OK] and continue toward a server that will die at
@@ -510,6 +518,21 @@ function Launch-Brainstem {
         $ErrorActionPreference = $prevEAP
         Pop-Location
     }
+
+    # Dependencies BEFORE auth: if they cannot be installed, fail now — not after
+    # walking the user through a GitHub device-code authorization they can't use.
+    Push-Location "$BRAINSTEM_HOME\src\rapp_brainstem"
+    if (-not (Check-PythonDeps)) {
+        Write-Host "  [..] Installing missing dependencies..." -ForegroundColor Yellow
+        Run-PipInstall
+        if (-not (Check-PythonDeps)) {
+            Pop-Location
+            # Launching anyway would crash at `import requests` and strand the user
+            # on a browser tab pointing at a server that never bound port 7071.
+            throw "Python dependencies are missing and could not be installed (see messages above)"
+        }
+    }
+    Pop-Location
 
     $tokenFile = "$BRAINSTEM_HOME\src\rapp_brainstem\.copilot_token"
     $clientId = "Iv1.b507a08c87ecfe98"
@@ -635,18 +658,6 @@ function Launch-Brainstem {
 
     Push-Location "$BRAINSTEM_HOME\src\rapp_brainstem"
 
-    # Ensure deps are installed (handles first-run failure or stale install)
-    if (-not (Check-PythonDeps)) {
-        Write-Host "  [..] Installing missing dependencies..." -ForegroundColor Yellow
-        Run-PipInstall
-        if (-not (Check-PythonDeps)) {
-            Pop-Location
-            # Launching anyway would crash at `import requests` and strand the user
-            # on a browser tab pointing at a server that never bound port 7071.
-            throw "Python dependencies are missing and could not be installed (see messages above)"
-        }
-    }
-
     # Open browser after a delay
     Start-Job -ScriptBlock { Start-Sleep -Seconds 3; Start-Process "http://localhost:7071" } | Out-Null
 
@@ -669,9 +680,12 @@ function Main {
 
     Check-Prerequisites
     Install-Brainstem
-    Setup-Dependencies
+    # CLI wrappers and .env before dependencies: they are cheap, offline-safe and
+    # idempotent. If Setup-Dependencies throws, VERSION already matches remote, so
+    # a re-run takes the fast path and would otherwise never come back for them.
     Install-CLI
     Create-Env
+    Setup-Dependencies
 
     $installedVersion = ""
     $vf = "$BRAINSTEM_HOME\src\rapp_brainstem\VERSION"
