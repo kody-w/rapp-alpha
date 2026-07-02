@@ -105,6 +105,71 @@ function Resolve-PythonExe {
     return "python"
 }
 
+function Test-PipWorks {
+    param([string]$Py)
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $Py -m pip --version 2>&1 | Out-Null
+        return ($LASTEXITCODE -eq 0)
+    } catch {
+        return $false
+    } finally {
+        $ErrorActionPreference = $prev
+    }
+}
+
+function Ensure-Pip {
+    # A found Python is NOT guaranteed to have pip. Corp-managed images and
+    # stripped/partial installs ship a working python.exe with no pip module —
+    # seen in the wild on a fresh Windows 11 machine: every pip call printed
+    # "No module named pip", then the server died at `import requests` behind a
+    # dead localhost:7071 browser tab. Bootstrap order: ensurepip (stdlib,
+    # works offline, restores the pip bundled with Python) -> get-pip.py (network).
+    # Returns $true only when `python -m pip` actually works.
+    $py = Resolve-PythonExe
+    if (Test-PipWorks $py) { return $true }
+
+    Write-Host "  [..] Python has no pip — bootstrapping via ensurepip..." -ForegroundColor Yellow
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        # Write-Host, not bare pipeline output: Ensure-Pip's return value is its
+        # pipeline — stray tool output here would corrupt the caller's boolean.
+        & $py -m ensurepip --upgrade --default-pip 2>&1 | ForEach-Object { Write-Host "$_" }
+    } catch {
+    } finally {
+        $ErrorActionPreference = $prev
+    }
+    if (Test-PipWorks $py) {
+        Write-Host "  [OK] pip bootstrapped via ensurepip" -ForegroundColor Green
+        return $true
+    }
+
+    Write-Host "  [..] ensurepip unavailable — fetching get-pip.py..." -ForegroundColor Yellow
+    $getPip = Join-Path $env:TEMP "rapp-get-pip.py"
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile $getPip -UseBasicParsing -TimeoutSec 120
+        & $py $getPip 2>&1 | ForEach-Object { Write-Host "$_" }
+    } catch {
+    } finally {
+        $ErrorActionPreference = $prev
+        Remove-Item $getPip -Force -ErrorAction SilentlyContinue
+    }
+    if (Test-PipWorks $py) {
+        Write-Host "  [OK] pip bootstrapped via get-pip.py" -ForegroundColor Green
+        return $true
+    }
+
+    Write-Host "  [X] Python at '$py' has no pip and it could not be bootstrapped." -ForegroundColor Red
+    Write-Host "      Fix it manually, then re-run this installer:" -ForegroundColor Yellow
+    Write-Host "        `"$py`" -m ensurepip --upgrade --default-pip" -ForegroundColor Cyan
+    Write-Host "      Or reinstall Python from https://python.org with 'pip' checked." -ForegroundColor Yellow
+    return $false
+}
+
 function Check-Prerequisites {
     Write-Host "Checking prerequisites..."
 
@@ -329,6 +394,10 @@ function Install-Brainstem {
 function Run-PipInstall {
     $reqFile = "$BRAINSTEM_HOME\src\rapp_brainstem\requirements.txt"
     $py = Resolve-PythonExe
+    # Without pip every install below is guaranteed noise — bootstrap it first.
+    # On $false, Ensure-Pip already printed the actionable fix; the dep gates in
+    # Setup-Dependencies / Launch-Brainstem turn that into an honest failure.
+    if (-not (Ensure-Pip)) { return }
     # Use the call operator, NOT Start-Process (same reasoning as Check-PythonDeps):
     # the call operator quotes a $reqFile path containing spaces correctly, and it
     # needs no console attachment — Start-Process -NoNewWindow -Wait can block
@@ -374,10 +443,22 @@ function Setup-Dependencies {
     Write-Host "Installing dependencies..."
     Push-Location "$BRAINSTEM_HOME\src\rapp_brainstem"
     Run-PipInstall
-    if (-not (Check-PythonDeps)) {
-        Write-Host "  [!] Some dependencies may not have installed correctly" -ForegroundColor Yellow
+    $depsOk = Check-PythonDeps
+    if (-not $depsOk) {
+        # v0.6.2 accidentally self-healed transient pip failures via the second
+        # Run-PipInstall in Launch-Brainstem. Keep one deliberate retry here so
+        # a PyPI/DNS blip doesn't hard-abort a fresh install.
+        Write-Host "  [..] Dependency check failed — retrying pip install once..." -ForegroundColor Yellow
+        Run-PipInstall
+        $depsOk = Check-PythonDeps
     }
     Pop-Location
+    if (-not $depsOk) {
+        # Never print [OK] and continue toward a server that will die at
+        # `import requests` behind a dead browser tab — stop here, honestly,
+        # with the guidance Ensure-Pip/pip printed above.
+        throw "Python dependencies failed to install (see messages above)"
+    }
     Write-Host "  [OK] Dependencies installed" -ForegroundColor Green
 }
 
@@ -437,6 +518,21 @@ function Launch-Brainstem {
         $ErrorActionPreference = $prevEAP
         Pop-Location
     }
+
+    # Dependencies BEFORE auth: if they cannot be installed, fail now — not after
+    # walking the user through a GitHub device-code authorization they can't use.
+    Push-Location "$BRAINSTEM_HOME\src\rapp_brainstem"
+    if (-not (Check-PythonDeps)) {
+        Write-Host "  [..] Installing missing dependencies..." -ForegroundColor Yellow
+        Run-PipInstall
+        if (-not (Check-PythonDeps)) {
+            Pop-Location
+            # Launching anyway would crash at `import requests` and strand the user
+            # on a browser tab pointing at a server that never bound port 7071.
+            throw "Python dependencies are missing and could not be installed (see messages above)"
+        }
+    }
+    Pop-Location
 
     $tokenFile = "$BRAINSTEM_HOME\src\rapp_brainstem\.copilot_token"
     $clientId = "Iv1.b507a08c87ecfe98"
@@ -562,12 +658,6 @@ function Launch-Brainstem {
 
     Push-Location "$BRAINSTEM_HOME\src\rapp_brainstem"
 
-    # Ensure deps are installed (handles first-run failure or stale install)
-    if (-not (Check-PythonDeps)) {
-        Write-Host "  [..] Installing missing dependencies..." -ForegroundColor Yellow
-        Run-PipInstall
-    }
-
     # Open browser after a delay
     Start-Job -ScriptBlock { Start-Sleep -Seconds 3; Start-Process "http://localhost:7071" } | Out-Null
 
@@ -590,9 +680,12 @@ function Main {
 
     Check-Prerequisites
     Install-Brainstem
-    Setup-Dependencies
+    # CLI wrappers and .env before dependencies: they are cheap, offline-safe and
+    # idempotent. If Setup-Dependencies throws, VERSION already matches remote, so
+    # a re-run takes the fast path and would otherwise never come back for them.
     Install-CLI
     Create-Env
+    Setup-Dependencies
 
     $installedVersion = ""
     $vf = "$BRAINSTEM_HOME\src\rapp_brainstem\VERSION"
