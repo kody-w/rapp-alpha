@@ -89,6 +89,9 @@ _version_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSIO
 VERSION = open(_version_file, encoding="utf-8").read().strip() if os.path.exists(_version_file) else "0.0.0"
 
 COPILOT_TOKEN_URL = "https://api.github.com/copilot_internal/v2/token"
+# Where the in-app "Get Help" flow files issues. Users' help requests go to the
+# support repo, keeping the engineering tracker (this repo) clean.
+SUPPORT_REPO = "kody-w/rapp-support"
 
 
 def _atomic_write_json(path, data):
@@ -1934,7 +1937,7 @@ def diagnostics_report():
 
     try:
         resp = requests.post(
-            "https://api.github.com/repos/kody-w/rapp-installer/issues",
+            f"https://api.github.com/repos/{SUPPORT_REPO}/issues",
             headers={
                 "Authorization": f"Bearer {github_token}",
                 "Accept": "application/vnd.github+json",
@@ -1959,7 +1962,7 @@ def diagnostics_report():
             try:
                 result = subprocess.run(
                     ["gh", "issue", "create",
-                     "--repo", "kody-w/rapp-installer",
+                     "--repo", SUPPORT_REPO,
                      "--title", f"🆘 Help request — v{VERSION}",
                      "--body", issue_body],
                     capture_output=True, text=True, timeout=30,
