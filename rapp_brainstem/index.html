@@ -182,6 +182,10 @@
     font-size: 14px; line-height: 1.6;
     max-width: 780px; word-break: break-word;
   }
+  /* Long replies earn the lateral whitespace: widen instead of forcing a
+     scroll through a skinny column. Capped for line-length readability. */
+  .msg.wide { max-width: min(1200px, calc(100vw - 180px)); }
+  .msg.wide .bubble { max-width: 100%; }
   .msg.assistant .bubble {
     background: #161b22; border: 1px solid #21262d;
     border-radius: 4px 12px 12px 12px;
@@ -1875,6 +1879,8 @@
     const right = document.createElement('div');
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
+    // Long responses expand into the unused lateral space.
+    if (role === 'assistant' && text && text.length > 1200) wrap.classList.add('wide');
     if (role === 'assistant' && typeof marked !== 'undefined') {
       // Models often emit \u2022 bullets, which markdown doesn't treat as list
       // markers — the lines collapse into one run-on paragraph. Normalize them.
