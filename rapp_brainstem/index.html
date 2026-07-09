@@ -2847,7 +2847,7 @@
         const ch = card.offsetHeight, cw = card.offsetWidth;
         let top, left;
         const inChat = t.id !== 'chat' && t.closest && t.closest('#chat');
-        if (t.id === 'agents-panel' && r.left >= cw + 32) {
+        if ((t.id === 'agents-panel' || t.id === 'registry-panel') && r.left >= cw + 32) {
           // The panel is right-anchored and tall — sit beside it on the left
           // so the list being described stays fully visible.
           left = r.left - cw - 16;
@@ -3027,7 +3027,8 @@
           html: `<h3>There's a whole library.</h3>
             <p>You traded one agent by hand. There's also a community registry — hundreds of agents, one click each. Grab the one that changes everything: <strong>an agent that creates agents</strong>.</p>`,
           hint: `Click the <strong>book button</strong> (top right), search <em>learn new</em>, and click <strong>Add</strong> on <strong>@rapp/learn_new</strong>.`,
-          target: () => $('#registry-btn'), rpanel: true, wait: 'installed', skippable: true, skipTo: 'end',
+          target: () => { const p = $('#registry-panel'); return (p && p.classList.contains('open')) ? p : $('#registry-btn'); },
+          rpanel: true, wait: 'installed', skippable: true, skipTo: 'end',
           onEnter: async function () { this._baseline = await agentFiles(); },
           reactHtml: `<h3>Installed. Live.</h3>
             <p>That agent's whole job is to <strong>build other agents</strong> from plain language. Which means…</p>`
