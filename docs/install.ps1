@@ -303,7 +303,7 @@ function Check-Prerequisites {
 }
 
 # ── soul refresh on upgrade (issue #40) ──────────────────────────────────────────
-# Normalized SHA-256 of a soul.md, computed IDENTICALLY to rapp_brainstem/soul_hash.py
+# Normalized SHA-256 of a soul.md, computed IDENTICALLY to rapp_brainstem/tests/soul_hash.py
 # so the shipped soul_defaults.sha256 manifest works for both installers. Normalize:
 # strip a UTF-8 BOM, CRLF->LF, strip trailing space/tab per line, exactly one trailing
 # newline; then Get-FileHash a UTF-8 (no BOM) temp copy. Returns lowercase hex, or $null
@@ -409,7 +409,7 @@ function Install-Brainstem {
             if (Test-Path "$Backup\soul.md") {
                 $soulRefreshed = $false
                 if ($pullOk) {
-                    $Manifest = "$BRAINSTEM_HOME\src\rapp_brainstem\soul_defaults.sha256"
+                    $Manifest = "$BRAINSTEM_HOME\src\rapp_brainstem\tests\soul_defaults.sha256"
                     $OldHash = Get-NormalizedSoulHash "$Backup\soul.md"
                     $NewHash = Get-NormalizedSoulHash $SoulFile
                     if ($OldHash -and $NewHash -and ($OldHash -ne $NewHash) -and (Test-SoulHashInManifest $OldHash $Manifest)) {

@@ -241,14 +241,14 @@ check_prereqs() {
 #              soul.md.bak-<date>, and print one line saying so.
 #   return 1 → preserve : caller restores <old_soul> byte-for-byte (today's behavior).
 # It only returns 0 when the old soul is an UNMODIFIED historical default — its
-# normalized hash (rapp_brainstem/soul_hash.py) is listed in soul_defaults.sha256 —
+# normalized hash (rapp_brainstem/tests/soul_hash.py) is listed in the manifest —
 # AND the new default differs. Any customization, or any uncertainty (no python, no
 # manifest, unreadable/undecodable file), fails safe to preserve. It never clobbers.
 maybe_refresh_soul() {
     local old="$1" newdef="$2"
     local src_dir="$BRAINSTEM_HOME/src/rapp_brainstem"
-    local hasher="$src_dir/soul_hash.py"
-    local manifest="$src_dir/soul_defaults.sha256"
+    local hasher="$src_dir/tests/soul_hash.py"
+    local manifest="$src_dir/tests/soul_defaults.sha256"
 
     [ -n "${PYTHON_CMD:-}" ] && [ -f "$hasher" ] && [ -f "$manifest" ] || return 1
 

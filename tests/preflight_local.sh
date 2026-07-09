@@ -212,7 +212,7 @@ fi
 if "$FAKE_HOME/.brainstem/venv/bin/python" -m pytest --version >/dev/null 2>&1 || \
    "$FAKE_HOME/.brainstem/venv/bin/pip" install -q pytest >/dev/null 2>&1; then
     if (cd "$FAKE_HOME/.brainstem/src/rapp_brainstem" && \
-        "$FAKE_HOME/.brainstem/venv/bin/python" -m pytest test_local_agents.py test_model_selection.py -q >"$SANDBOX/pytest.log" 2>&1); then
+        "$FAKE_HOME/.brainstem/venv/bin/python" -m pytest tests/ -q >"$SANDBOX/pytest.log" 2>&1); then
         ok "unit suite green inside the installed copy ($(tail -1 "$SANDBOX/pytest.log"))"
     else
         bad "unit suite failed inside installed copy — see $SANDBOX/pytest.log"
