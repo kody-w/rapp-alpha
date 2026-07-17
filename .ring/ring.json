@@ -1,0 +1,28 @@
+{
+  "schema": "rapp-ring/1",
+  "name": "alpha",
+  "repository": "kody-w/rapp-alpha",
+  "pages_url": "https://kody-w.github.io/rapp-alpha",
+  "support_repository": "kody-w/rapp-alpha",
+  "parent": "nightly",
+  "rewrites": [
+    {
+      "from": "kody-w.github.io/rapp-installer",
+      "to": "kody-w.github.io/rapp-alpha",
+      "expected_count": 25
+    },
+    {
+      "from": "kody-w/rapp-installer",
+      "to": "kody-w/rapp-alpha",
+      "expected_count": 69
+    },
+    {
+      "from": "kody-w/rapp-support",
+      "to": "kody-w/rapp-alpha",
+      "expected_count": 4
+    }
+  ],
+  "protected_paths": [
+    ".ring/"
+  ]
+}
